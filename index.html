@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Roster Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#152029;
+    --paper:#f6f5f1;
+    --panel:#ffffff;
+    --line:#d9d5c9;
+    --slate:#2c3e46;
+    --teal:#3c6e64;
+    --clay:#a8542f;
+    --amber:#c68a1f;
+    --amber-bg:#fbf1de;
+    --red:#a33b2c;
+    --red-bg:#faeae6;
+    --green:#3c6e46;
+    --green-bg:#eaf3ea;
+    --muted:#6b6355;
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Space Grotesk', sans-serif;
+    --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+  a{color:inherit;}
+
+  .shell{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
+
+  header.top{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:24px;flex-wrap:wrap;gap:16px;
+  }
+  .brand-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0 0 6px;}
+  h1{font-family:var(--display);font-size:30px;margin:0;font-weight:700;letter-spacing:-.01em;}
+  .top-meta{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;line-height:1.6;}
+  .top-meta b{color:var(--ink);}
+
+  .upload-row{
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    background:var(--slate);color:#fff;border-radius:10px;padding:16px 18px;margin-bottom:28px;
+  }
+  .upload-row label{font-size:13px;font-family:var(--mono);opacity:.85;}
+  .upload-row input[type=text]{
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:6px;
+    color:#fff;padding:8px 10px;font-family:var(--body);font-size:13px;min-width:160px;
+  }
+  .upload-row input[type=text]::placeholder{color:rgba(255,255,255,.55);}
+  .file-btn{
+    position:relative;overflow:hidden;background:#fff;color:var(--slate);border:none;border-radius:6px;
+    padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:var(--body);
+  }
+  .file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .upload-status{font-family:var(--mono);font-size:12px;color:#cfe0da;margin-left:auto;}
+  .upload-status.err{color:#ffb4a3;}
+
+  .grid2{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;margin-bottom:28px;}
+  @media (max-width:860px){.grid2{grid-template-columns:1fr;}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;}
+  .panel h2{
+    font-family:var(--display);font-size:15px;text-transform:uppercase;letter-spacing:.05em;
+    margin:0 0 14px;display:flex;align-items:center;gap:8px;
+  }
+  .count-badge{font-family:var(--mono);font-size:11px;background:var(--ink);color:#fff;border-radius:20px;padding:2px 8px;}
+
+  .alert-item{border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;line-height:1.45;border-left:4px solid;}
+  .alert-item.critical{background:var(--red-bg);border-color:var(--red);color:#5e2318;}
+  .alert-item.warning{background:var(--amber-bg);border-color:var(--amber);color:#5b430f;}
+  .alert-item .tag{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:2px;opacity:.75;}
+  .empty-note{color:var(--muted);font-size:13px;font-style:italic;}
+
+  .change-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .change-list{list-style:none;margin:0;padding:0;}
+  .change-list li{
+    font-size:13px;padding:7px 0;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;gap:8px;
+  }
+  .change-list li:last-child{border-bottom:none;}
+  .name{font-weight:600;}
+  .sub{color:var(--muted);font-size:11px;font-family:var(--mono);}
+  .col-added h3{color:var(--green);}
+  .col-removed h3{color:var(--red);}
+  .change-cols h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px;font-family:var(--mono);}
+  .moved-box{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
+  .tab-btn{
+    font-family:var(--mono);font-size:12px;padding:7px 12px;border-radius:6px;border:1px solid var(--line);
+    background:#fff;cursor:pointer;color:var(--muted);
+  }
+  .tab-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+  .location-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:20px;}
+  .loc-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .loc-head h2{font-family:var(--display);font-size:20px;margin:0;}
+  .loc-head .ratio{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:4px;}
+  .census-pill{background:var(--teal);color:#fff;border-radius:8px;padding:10px 16px;text-align:center;}
+  .census-pill .num{font-family:var(--display);font-size:24px;font-weight:700;display:block;}
+  .census-pill .lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.85;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
+  table caption{text-align:left;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px;caption-side:top;}
+  th{background:#eeeae0;text-align:left;padding:7px 9px;font-weight:600;border:1px solid var(--line);font-size:11.5px;}
+  td{padding:7px 9px;border:1px solid var(--line);}
+  td.open{color:var(--clay);font-style:italic;}
+  tr.band-row td:first-child{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;}
+
+  .history{margin-top:28px;}
+  .history-item{border-left:3px solid var(--line);padding:6px 0 6px 12px;margin-bottom:10px;font-size:13px;}
+  .history-item .when{font-family:var(--mono);font-size:11px;color:var(--muted);}
+
+  footer.note{margin-top:40px;font-size:12px;color:var(--muted);font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="top">
+    <div>
+      <p class="brand-eyebrow">Workforce &middot; Live Roster</p>
+      <h1>Roster Tracker</h1>
+    </div>
+    <div class="top-meta" id="topMeta">No data yet — upload a roster to get started.</div>
+  </header>
+
+  <div class="upload-row">
+    <label for="uploaderName">Uploaded by</label>
+    <input type="text" id="uploaderName" placeholder="Your name" />
+    <label class="file-btn">Choose roster file (.xlsx)
+      <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    </label>
+    <span class="upload-status" id="uploadStatus"></span>
+  </div>
+
+  <div class="grid2">
+    <div class="panel" id="alertsPanel">
+      <h2>Ratio &amp; Census Alerts <span class="count-badge" id="alertCount">0</span></h2>
+      <div id="alertsBody"><p class="empty-note">No data yet.</p></div>
+    </div>
+
+    <div class="panel" id="changesPanel">
+      <h2>Changes — Most Recent Upload</h2>
+      <div id="changesBody"><p class="empty-note">Upload a roster to see who's new or departed.</p></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:28px;">
+    <h2>Tracker View</h2>
+    <div class="tabs" id="tabBar"></div>
+    <div id="locationBody"><p class="empty-note">No locations loaded yet.</p></div>
+  </div>
+
+  <div class="history">
+    <h2 style="font-family:var(--display);font-size:15px;text-transform:uppercase;letter-spacing:.05em;">Upload History</h2>
+    <div id="historyBody"><p class="empty-note">No uploads yet.</p></div>
+  </div>
+
+  <footer class="note">roster-tracker · Netlify Functions + Blobs · client-side parsing, nothing leaves your Netlify site</footer>
+</div>
+
+<script>
+const API = "/api/roster";
+let state = { snapshot: { locations: [] }, history: [], alerts: [] };
+let activeLocation = null;
+
+// ---------- Excel parsing (mirrors the fixed roster layout) ----------
+function safe(v){ return v === undefined ? null : v; }
+
+function parseWorkbook(wb){
+  const locations = [];
+  for (const sheetName of wb.SheetNames){
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+    if (!rows || !rows.length) continue;
+
+    const row2 = rows[1] || [];
+    const signature = (safe(row2[3]) || "").toString();
+    if (!/staffing capacity roster/i.test(signature)) continue; // skip non-roster tabs
+
+    // Current census: label at row idx2 col3, value is first number scanning cols 4-15
+    const censusRow = rows[2] || [];
+    let currentCensus = null;
+    for (let c = 4; c <= 15; c++){
+      const v = safe(censusRow[c]);
+      if (typeof v === "number"){ currentCensus = v; break; }
+    }
+
+    // Admin roles: headers row idx4 (cols 4-11), names row idx5
+    const adminHeaders = rows[4] || [];
+    const adminNames = rows[5] || [];
+    const adminRoles = [];
+    for (let c = 4; c <= 11; c++){
+      const role = safe(adminHeaders[c]);
+      const name = safe(adminNames[c]);
+      if (role && name) adminRoles.push({ role: String(role).trim(), name: String(name).trim() });
+    }
+
+    // Case assignment grid: headers row idx10 (cols 4-9), band rows idx11-20, band label col3
+    const gridHeaders = rows[10] || [];
+    const roleCols = [];
+    for (let c = 4; c <= 9; c++){
+      const h = safe(gridHeaders[c]);
+      if (h) roleCols.push({ col: c, role: String(h).trim() });
+    }
+    const caseAssignments = [];
+    for (let r = 11; r <= 20; r++){
+      const row = rows[r];
+      if (!row) continue;
+      const band = safe(row[3]);
+      for (const rc of roleCols){
+        const name = safe(row[rc.col]);
+        if (!name) continue;
+        String(name).split(/[,/]/).map(s => s.trim()).filter(Boolean).forEach(n => {
+          caseAssignments.push({ band: band ? String(band).trim() : null, role: rc.role, name: n });
+        });
+      }
+    }
+
+    // PRN staff: header row idx23 (Role,Name,Type,Status at cols 3-6), entries from idx24
+    const prnStaff = [];
+    for (let r = 24; r < rows.length; r++){
+      const row = rows[r];
+      if (!row) continue;
+      const role = safe(row[3]);
+      const name = safe(row[4]);
+      const type = safe(row[5]);
+      const status = safe(row[6]);
+      if (!role && !name) continue;
+      prnStaff.push({
+        role: role ? String(role).trim() : "",
+        name: name ? String(name).trim() : "",
+        type: type ? String(type).trim() : "",
+        status: status ? String(status).trim() : "",
+      });
+    }
+
+    const ratioText = (safe(row2[3]) || "").toString();
+
+    locations.push({
+      location: sheetName,
+      displayName: (safe(rows[0] ? rows[0][3] : null) || sheetName).toString(),
+      ratioText,
+      currentCensus,
+      adminRoles,
+      caseAssignments,
+      prnStaff,
+    });
+  }
+  return locations;
+}
+
+// ---------- API ----------
+async function loadState(){
+  const res = await fetch(API);
+  const data = await res.json();
+  state = data;
+  activeLocation = state.snapshot.locations[0]?.location || null;
+  render();
+}
+
+async function uploadLocations(locations, uploadedBy){
+  const res = await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ locations, uploadedBy }),
+  });
+  if (!res.ok) throw new Error("Upload failed (" + res.status + ")");
+  return res.json();
+}
+
+// ---------- Rendering ----------
+function fmtTime(iso){
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function render(){
+  const { snapshot, history, alerts } = state;
+  const locations = snapshot.locations || [];
+
+  document.getElementById("topMeta").innerHTML = snapshot.updatedAt
+    ? `Last updated <b>${fmtTime(snapshot.updatedAt)}</b> by <b>${snapshot.uploadedBy || "Unknown"}</b> &middot; ${locations.length} locations`
+    : "No data yet — upload a roster to get started.";
+
+  renderAlerts(alerts || []);
+  renderChanges(history && history[0]);
+  renderTabs(locations);
+  renderLocation(locations);
+  renderHistory(history || []);
+}
+
+function renderAlerts(alerts){
+  document.getElementById("alertCount").textContent = alerts.length;
+  const body = document.getElementById("alertsBody");
+  if (!alerts.length){
+    body.innerHTML = '<p class="empty-note">No ratio or census alerts right now.</p>';
+    return;
+  }
+  body.innerHTML = alerts.map(a => `
+    <div class="alert-item ${a.level}">
+      <span class="tag">${a.location} &middot; ${a.role}</span>
+      ${a.message}
+    </div>
+  `).join("");
+}
+
+function renderChanges(latest){
+  const body = document.getElementById("changesBody");
+  if (!latest){
+    body.innerHTML = '<p class="empty-note">Upload a roster to see who\'s new or departed.</p>';
+    return;
+  }
+  const added = latest.added || [], removed = latest.removed || [], moved = latest.moved || [];
+  const list = (items, cls) => items.length
+    ? `<ul class="change-list">${items.map(i => `<li><span class="name">${i.name}</span><span class="sub">${i.location} &middot; ${i.role || i.section || ""}</span></li>`).join("")}</ul>`
+    : '<p class="empty-note">None</p>';
+
+  let html = `
+    <div class="change-cols">
+      <div class="col-added"><h3>New (${added.length})</h3>${list(added)}</div>
+      <div class="col-removed"><h3>Departed (${removed.length})</h3>${list(removed)}</div>
+    </div>
+  `;
+  if (moved.length){
+    html += `<div class="moved-box"><h3 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--clay);">Moved locations (${moved.length})</h3>
+      <ul class="change-list">${moved.map(m => `<li><span class="name">${m.name}</span><span class="sub">${m.from} &rarr; ${m.to}</span></li>`).join("")}</ul>
+    </div>`;
+  }
+  body.innerHTML = html;
+}
+
+function renderTabs(locations){
+  const bar = document.getElementById("tabBar");
+  if (!locations.length){ bar.innerHTML = ""; return; }
+  if (!activeLocation) activeLocation = locations[0].location;
+  bar.innerHTML = locations.map(l =>
+    `<button class="tab-btn ${l.location === activeLocation ? "active" : ""}" data-loc="${l.location}">${l.location}</button>`
+  ).join("");
+  bar.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => { activeLocation = btn.dataset.loc; render(); });
+  });
+}
+
+function renderLocation(locations){
+  const body = document.getElementById("locationBody");
+  const loc = locations.find(l => l.location === activeLocation);
+  if (!loc){ body.innerHTML = '<p class="empty-note">No locations loaded yet.</p>'; return; }
+
+  const adminRows = loc.adminRoles.map(r => `<tr><td>${r.role}</td><td class="${/^open hire$/i.test(r.name) ? "open" : ""}">${r.name}</td></tr>`).join("")
+    || `<tr><td colspan="2" class="empty-note">No administrative roles listed.</td></tr>`;
+
+  const bandsSet = [...new Set(loc.caseAssignments.map(c => c.band))];
+  const rolesSet = [...new Set(loc.caseAssignments.map(c => c.role))];
+  const gridRows = bandsSet.map(band => {
+    const cells = rolesSet.map(role => {
+      const names = loc.caseAssignments.filter(c => c.band === band && c.role === role).map(c => c.name);
+      return `<td>${names.join(", ") || "—"}</td>`;
+    }).join("");
+    return `<tr class="band-row"><td>${band}</td>${cells}</tr>`;
+  }).join("") || `<tr><td colspan="${rolesSet.length + 1}" class="empty-note">No case assignments listed.</td></tr>`;
+
+  const prnRows = loc.prnStaff.map(p => `<tr><td>${p.role}</td><td>${p.name}</td><td>${p.type}</td><td>${p.status}</td></tr>`).join("")
+    || `<tr><td colspan="4" class="empty-note">No PRN staff listed.</td></tr>`;
+
+  body.innerHTML = `
+    <div class="loc-head">
+      <div>
+        <h2>${loc.displayName}</h2>
+        <div class="ratio">${loc.ratioText || ""}</div>
+      </div>
+      <div class="census-pill">
+        <span class="num">${loc.currentCensus ?? "—"}</span>
+        <span class="lbl">Current Census</span>
+      </div>
+    </div>
+
+    <table>
+      <caption>Administrative Roles</caption>
+      <thead><tr><th>Role</th><th>Name</th></tr></thead>
+      <tbody>${adminRows}</tbody>
+    </table>
+
+    <table>
+      <caption>Case Assignment Grid</caption>
+      <thead><tr><th>Patient Census</th>${rolesSet.map(r => `<th>${r}</th>`).join("")}</tr></thead>
+      <tbody>${gridRows}</tbody>
+    </table>
+
+    <table>
+      <caption>PRN Staff — Active &amp; Available</caption>
+      <thead><tr><th>Role</th><th>Name</th><th>Type</th><th>Status</th></tr></thead>
+      <tbody>${prnRows}</tbody>
+    </table>
+  `;
+}
+
+function renderHistory(history){
+  const body = document.getElementById("historyBody");
+  if (!history.length){ body.innerHTML = '<p class="empty-note">No uploads yet.</p>'; return; }
+  body.innerHTML = history.slice(0, 15).map(h => `
+    <div class="history-item">
+      <div class="when">${fmtTime(h.at)} &middot; ${h.uploadedBy}</div>
+      +${h.added.length} new / &minus;${h.removed.length} departed${h.moved.length ? " / " + h.moved.length + " moved" : ""}
+    </div>
+  `).join("");
+}
+
+// ---------- Wire up upload ----------
+document.getElementById("fileInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById("uploadStatus");
+  const uploadedBy = document.getElementById("uploaderName").value.trim() || "Unknown";
+  statusEl.classList.remove("err");
+  statusEl.textContent = "Reading file…";
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array", cellDates: true });
+    const locations = parseWorkbook(wb);
+    if (!locations.length) throw new Error("No roster-formatted tabs found in this file.");
+    statusEl.textContent = "Comparing to last roster…";
+    const result = await uploadLocations(locations, uploadedBy);
+    state = result;
+    activeLocation = state.snapshot.locations[0]?.location || null;
+    render();
+    statusEl.textContent = "Updated " + fmtTime(state.snapshot.updatedAt);
+  } catch (err) {
+    console.error(err);
+    statusEl.classList.add("err");
+    statusEl.textContent = "Error: " + err.message;
+  } finally {
+    e.target.value = "";
+  }
+});
+
+loadState().catch(err => {
+  document.getElementById("topMeta").textContent = "Couldn't reach the tracker backend yet.";
+  console.error(err);
+});
+</script>
+</body>
+</html>
